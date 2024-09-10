@@ -63,9 +63,16 @@ def push_to_firebase(products):
     # Create a reference to the Firebase Realtime Database
     ref = db.reference("/products")
     
-    # Push each product to Firebase
+    # Fetch the current number of products already in Firebase
+    existing_products = ref.get()
+    if existing_products:
+        current_index = len(existing_products)  # Get the count of existing products
+    else:
+        current_index = 0  # Start from 0 if there are no products
+    
+    # Push each product to Firebase starting from the next available index
     for index, product in enumerate(products):
-        ref.child(f"product_{index + 1}").set(product)
+        ref.child(f"{current_index + index + 1}").set(product)
 
 # Push the product data to Firebase
 push_to_firebase(all_products)
