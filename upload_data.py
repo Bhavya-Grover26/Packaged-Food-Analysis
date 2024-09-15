@@ -1,10 +1,6 @@
 import requests
-import firebase_admin
-from firebase_admin import db, credentials
-import sys
-
-# Set the default encoding to utf-8
-sys.stdout.reconfigure(encoding='utf-8')
+from pymongo import MongoClient
+import time
 
 # API endpoint for products in India
 url = "https://world.openfoodfacts.org/country/india.json"
@@ -14,8 +10,12 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
 
-def fetch_all_products(url):
-    all_products = []
+# MongoDB Atlas connection setup
+client = MongoClient("mongodb+srv://packagedfoodanalysis:Ezk77HCR20JBULwo@cluster0.zzj38.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+db = client['openfoodfacts']  # Database name
+collection = db['products']   # Collection name
+
+def fetch_and_store_products(url):
     page = 1
     page_size = 100  # The Open Food Facts API may have a limit on page size
 
@@ -33,14 +33,29 @@ def fetch_all_products(url):
                 if not products:
                     break  # No more products to fetch
                 
-                all_products.extend(products)
+                # Insert or update products in MongoDB
+                for product in products:
+                    # Use update_one with upsert=True to handle duplicates
+                    collection.update_one(
+                        {"_id": product["_id"]},
+                        {"$set": product},
+                        upsert=True
+                    )
                 
-                # If we fetch fewer products than the page size, it means we've reached the last page
+                print(f"Processed {len(products)} products from page {page}.")
+                
+                # If fewer products than page_size are fetched, break (last page)
                 if len(products) < page_size:
                     break
                 
                 # Increment the page number
                 page += 1
+
+                # Add a delay to avoid hitting rate limits
+                time.sleep(10)  # Sleep for 10 seconds
+            elif response.status_code == 429:
+                print("Rate limit exceeded. Sleeping for 60 seconds...")
+                time.sleep(60)  # Sleep for 60 seconds if rate limit exceeded
             else:
                 print(f"Failed to retrieve data. Status code: {response.status_code}")
                 print(f"Response content: {response.text}")
@@ -49,32 +64,5 @@ def fetch_all_products(url):
             print(f"An error occurred: {e}")
             break
 
-    return all_products
-
-# Fetch all products
-all_products = fetch_all_products(url)
-
-# Initialize Firebase
-cred = credentials.Certificate("credentials.json")
-firebase_admin.initialize_app(cred, {"databaseURL": "https://food-scanner-8021d-default-rtdb.asia-southeast1.firebasedatabase.app/"})
-
-# Push data to Firebase
-def push_to_firebase(products):
-    # Create a reference to the Firebase Realtime Database
-    ref = db.reference("/products")
-    
-    # Fetch the current number of products already in Firebase
-    existing_products = ref.get()
-    if existing_products:
-        current_index = len(existing_products)  # Get the count of existing products
-    else:
-        current_index = 0  # Start from 0 if there are no products
-    
-    # Push each product to Firebase starting from the next available index
-    for index, product in enumerate(products):
-        ref.child(f"{current_index + index + 1}").set(product)
-
-# Push the product data to Firebase
-push_to_firebase(all_products)
-
-print(f"Data has been successfully pushed to Firebase.")
+# Fetch all products and store them in MongoDB
+fetch_and_store_products(url)
