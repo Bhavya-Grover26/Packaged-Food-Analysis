@@ -3,7 +3,7 @@ from pymongo import MongoClient
 import time
 
 # API endpoint for products in India
-url = "https://world.openfoodfacts.org/country/india.json"
+url = "https://world.openfoodfacts.org/country/france.json"
 
 # Define headers with a User-Agent
 headers = {
@@ -13,10 +13,10 @@ headers = {
 # MongoDB Atlas connection setup
 client = MongoClient("mongodb+srv://packagedfoodanalysis:Ezk77HCR20JBULwo@cluster0.zzj38.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['openfoodfacts']  # Database name
-collection = db['products']   # Collection name
+collection = db['products_with_france']   # Collection name
 
 def fetch_and_store_products(url):
-    page = 1
+    page = 92
     page_size = 100  # The Open Food Facts API may have a limit on page size
 
     while True:
